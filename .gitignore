@@ -15,6 +15,10 @@ poetry.lock
 
 # Python
 __pycache__/
+.pytest_cache/
+
+# DuBois report extras
+*.jsonl
 
 # Pip
 src/

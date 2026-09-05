@@ -2,7 +2,7 @@
 
 from concurrent.futures import Future
 
-from sherlock_project.sherlock import get_response
+from dubois.sherlock import get_response
 
 
 def _make_future_with_exception(exc):

@@ -1,31 +1,22 @@
-# Release instructions:
-  # 1. Update the version tag in the Dockerfile to match the version in sherlock/__init__.py
-  # 2. Update the VCS_REF tag to match the tagged version's FULL commit hash
-  # 3. Build image with BOTH latest and version tags
-    # i.e. `docker build -t sherlock/sherlock:0.16.0 -t sherlock/sherlock:latest .`
-
 FROM python:3.12-slim-bullseye AS build
-WORKDIR /sherlock
+WORKDIR /dubois
 
 RUN pip3 install --no-cache-dir --upgrade pip
 
 FROM python:3.12-slim-bullseye
-WORKDIR /sherlock
+WORKDIR /dubois
 
-ARG VCS_REF= # CHANGE ME ON UPDATE
-ARG VCS_URL="https://github.com/sherlock-project/sherlock"
-ARG VERSION_TAG= # CHANGE ME ON UPDATE
+ARG VCS_REF=
+ARG VERSION_TAG=
 
-ENV SHERLOCK_ENV=docker
+ENV DUBOIS_ENV=docker
 
-LABEL org.label-schema.vcs-ref=$VCS_REF \
-      org.label-schema.vcs-url=$VCS_URL \
-      org.label-schema.name="Sherlock" \
-      org.label-schema.version=$VERSION_TAG \
-      website="https://sherlockproject.xyz"
+LABEL org.label-schema.name="DuBois" \
+      org.label-schema.version=$VERSION_TAG
 
-RUN pip3 install --no-cache-dir sherlock-project==$VERSION_TAG
+COPY . /src
+RUN pip3 install --no-cache-dir /src
 
-WORKDIR /sherlock
+WORKDIR /dubois
 
-ENTRYPOINT ["sherlock"]
+ENTRYPOINT ["dubois"]

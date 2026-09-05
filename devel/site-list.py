@@ -4,7 +4,7 @@
 import json
 import os
 
-DATA_REL_URI: str = "sherlock_project/resources/data.json"
+DATA_REL_URI: str = "dubois/resources/data.json"
 
 DEFAULT_ENCODING = "utf-8"
 
@@ -28,7 +28,7 @@ with open("output/sites.mdx", "w", encoding=DEFAULT_ENCODING) as site_file:
     site_file.write("title: 'List of supported sites'\n")
     site_file.write("sidebarTitle: 'Supported sites'\n")
     site_file.write("icon: 'globe'\n")
-    site_file.write("description: 'Sherlock currently supports **400+** sites'\n")
+    site_file.write("description: 'DuBois currently supports **400+** sites'\n")
     site_file.write("---\n\n")
 
     for social_network, info in social_networks:

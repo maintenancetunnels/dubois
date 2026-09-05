@@ -5,12 +5,11 @@ import subprocess
 
 class Interactives:
     def run_cli(args:str = "") -> str:
-        """Pass arguments to Sherlock as a normal user on the command line"""
-        # Adapt for platform differences (Windows likes to be special)
+        """Pass arguments to DuBois as a normal user on the command line"""
         if platform.system() == "Windows":
-            command:str = f"py -m sherlock_project {args}"
+            command:str = f"py -m dubois {args}"
         else:
-            command:str = f"sherlock {args}"
+            command:str = f"dubois {args}"
 
         proc_out:str = ""
         try:
@@ -21,10 +20,10 @@ class Interactives:
 
 
     def walk_sherlock_for_files_with(pattern: str) -> list[str]:
-        """Check all files within the Sherlock package for matching patterns"""
+        """Check all files within the DuBois package for matching patterns"""
         pattern:re.Pattern = re.compile(pattern)
         matching_files:list[str] = []
-        for root, dirs, files in os.walk("sherlock_project"):
+        for root, dirs, files in os.walk("dubois"):
             for file in files:
                 file_path = os.path.join(root,file)
                 if "__pycache__" in file_path:

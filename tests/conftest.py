@@ -2,16 +2,16 @@ import os
 import json
 import urllib
 import pytest
-from sherlock_project.sites import SitesInformation
+from dubois.sites import SitesInformation
 
 def fetch_local_manifest(honor_exclusions: bool = True) -> dict[str, dict[str, str]]:
-    sites_obj = SitesInformation(data_file_path=os.path.join(os.path.dirname(__file__), "../sherlock_project/resources/data.json"), honor_exclusions=honor_exclusions)
+    sites_obj = SitesInformation(data_file_path=os.path.join(os.path.dirname(__file__), "../dubois/resources/data.json"), honor_exclusions=honor_exclusions)
     sites_iterable: dict[str, dict[str, str]] = {site.name: site.information for site in sites_obj}
     return sites_iterable
 
 @pytest.fixture()
 def sites_obj():
-    sites_obj = SitesInformation(data_file_path=os.path.join(os.path.dirname(__file__), "../sherlock_project/resources/data.json"))
+    sites_obj = SitesInformation(data_file_path=os.path.join(os.path.dirname(__file__), "../dubois/resources/data.json"))
     yield sites_obj
 
 @pytest.fixture(scope="session")

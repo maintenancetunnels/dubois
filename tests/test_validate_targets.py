@@ -2,9 +2,9 @@ import pytest
 import re
 import rstr
 
-from sherlock_project.sherlock import sherlock
-from sherlock_project.notify import QueryNotify
-from sherlock_project.result import QueryResult, QueryStatus
+from dubois.sherlock import sherlock
+from dubois.notify import QueryNotify
+from dubois.result import QueryResult, QueryStatus
 
 
 FALSE_POSITIVE_ATTEMPTS: int = 2    # Since the usernames are randomly generated, it's POSSIBLE that a real username can be hit
