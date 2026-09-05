@@ -72,6 +72,9 @@ class QueryNotifyPrint(QueryNotify):
 
         if result.status == QueryStatus.CLAIMED:
             self.claimed_count += 1
+            extra = ""
+            if self.result.context:
+                extra = Style.DIM + f"  {self.result.context}" + Style.RESET_ALL
             print(
                 Style.BRIGHT
                 + Fore.WHITE
@@ -85,6 +88,7 @@ class QueryNotifyPrint(QueryNotify):
                 + f" {self.result.site_name}: "
                 + Style.RESET_ALL
                 + f"{self.result.site_url_user}"
+                + extra
             )
             if self.browse:
                 webbrowser.open(self.result.site_url_user, 2)

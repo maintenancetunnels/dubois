@@ -32,6 +32,8 @@ class Probe:
     error_type: Any
     error_msg: Any
     error_code: Any
+    claimed_msg: Any = None
+    claimed_code: Any = None
     is_control: bool = False
     extra: dict[str, Any] = field(default_factory=dict)
 
@@ -157,6 +159,8 @@ def build_probe(
         error_type=error_type,
         error_msg=net_info.get("errorMsg"),
         error_code=net_info.get("errorCode"),
+        claimed_msg=net_info.get("claimedMsg"),
+        claimed_code=net_info.get("claimedCode"),
         is_control=is_control,
     )
 

@@ -25,9 +25,29 @@ pip install -e .
 ```
 dubois user123
 dubois --local --site GitHub --site GitLab ppfeister
-dubois --calibrate --jsonl someuser
-dubois --sync --workers 20 someuser
+dubois --calibrate --jsonl --dorks --records someuser
+dubois --whatsmyname someuser
+dubois --email name@example.com
+dubois --phone +15551234567
+dubois --deep someuser
 ```
+
+Claimed hits now parse public Open Graph / JSON-LD (name, bio, avatar). `--no-enrich` turns that off.
+
+`--email` / `--phone` / `--deep` wrap **holehe**, **ignorant**, and **maigret** if installed:
+
+```
+pip install dubois-osint[email]
+pip install dubois-osint[phone]
+pip install dubois-osint[deep]
+pip install dubois-osint[full]
+```
+
+holehe is run with `-NP` so password-recovery probes (which can notify the inbox) stay off.
+
+## Public records
+
+**DuBois does not scrape courts, assessors, or voter rolls.** Those sites are often public in a browser and forbidden to harvest in bulk. `--records` prints official search URLs (CourtListener, SEC EDGAR, OpenCorporates, site:.gov dorks) for you to open. `--dorks` prints search-engine URLs; it does not scrape Google.
 
 ```
 dubois --help

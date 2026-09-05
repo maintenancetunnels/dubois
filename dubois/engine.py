@@ -13,6 +13,7 @@ import requests
 from requests_futures.sessions import FuturesSession
 
 from dubois.classify import classify_http
+from dubois.enrich import extract_profile
 from dubois.notify import QueryNotify
 from dubois.probe import (
     HEAD_FALLBACK_CODES,
@@ -99,6 +100,7 @@ def _empty_site_result(net_info: dict, result: QueryResult) -> dict[str, Any]:
         "status": result,
         "http_status": "",
         "response_text": "",
+        "profile": None,
     }
 
 
@@ -117,6 +119,8 @@ def _store_outcome(
         error_msg=probe.error_msg,
         error_code=probe.error_code,
         error_text=outcome.error_text,
+        claimed_msg=probe.claimed_msg,
+        claimed_code=probe.claimed_code,
     )
     if dump_response:
         _dump_response(probe, outcome, status)
@@ -136,12 +140,19 @@ def _store_outcome(
             response_text = outcome.text.encode("utf-8")
         except Exception:
             response_text = ""
+    profile = None
+    if status is QueryStatus.CLAIMED and outcome.text:
+        facts = extract_profile(outcome.text, probe.url_user)
+        if any((facts.title, facts.display_name, facts.bio, facts.image, facts.links)):
+            profile = facts.as_dict()
+            result.context = facts.one_line() or result.context
     return {
         "url_main": net_info.get("urlMain"),
         "url_user": probe.url_user,
         "status": result,
         "http_status": http_status,
         "response_text": response_text,
+        "profile": profile,
     }
 
 
@@ -207,6 +218,14 @@ def _text_of(response) -> str:
         return ""
 
 
+def _body_kwargs(payload: Any) -> dict[str, Any]:
+    if payload is None:
+        return {}
+    if isinstance(payload, (dict, list)):
+        return {"json": payload}
+    return {"data": payload}
+
+
 def _dispatch_sync(
     session: DuboisFuturesSession,
     probe: Probe,
@@ -218,7 +237,7 @@ def _dispatch_sync(
         "headers": probe.headers,
         "allow_redirects": probe.allow_redirects,
         "timeout": timeout,
-        "json": probe.payload,
+        **_body_kwargs(probe.payload),
     }
     proxies = _proxy_dict(proxy)
     if proxies:
@@ -307,7 +326,7 @@ async def _fetch_one(session, probe: Probe, timeout: float, proxy: str | None, s
                 "allow_redirects": probe.allow_redirects,
                 "timeout": timeout_cfg,
                 "proxy": proxy,
-                "json": probe.payload,
+                **_body_kwargs(probe.payload),
             }
             async with session.request(**kwargs) as resp:
                 status = resp.status
@@ -319,7 +338,7 @@ async def _fetch_one(session, probe: Probe, timeout: float, proxy: str | None, s
                         allow_redirects=probe.allow_redirects,
                         timeout=timeout_cfg,
                         proxy=proxy,
-                        json=probe.payload,
+                        **_body_kwargs(probe.payload),
                     ) as retry:
                         text = await retry.text(errors="replace")
                         return ProbeOutcome(
@@ -462,6 +481,7 @@ def sherlock(
     calibrate: bool = False,
     engine: str = "sync",
     keep_response_text: bool = False,
+    enrich: bool = True,
 ) -> dict[str, dict[str, Any]]:
     """Run DuBois analysis for one username.
 
@@ -471,6 +491,11 @@ def sherlock(
     query_notify.start(username)
     results_total: dict[str, dict[str, Any]] = {}
     probes = _build_probe_list(username, site_data, query_notify, results_total, calibrate)
+    if enrich:
+        probes = [
+            replace(probe, method="GET") if probe.method == "HEAD" else probe
+            for probe in probes
+        ]
     if not probes:
         return results_total
 
@@ -494,6 +519,8 @@ def sherlock(
                 error_msg=outcome.probe.error_msg,
                 error_code=outcome.probe.error_code,
                 error_text=outcome.error_text,
+                claimed_msg=outcome.probe.claimed_msg,
+                claimed_code=outcome.probe.claimed_code,
             )
             control_status[site_name] = status
 
@@ -547,6 +574,7 @@ def search(
     local: bool = False,
     honor_exclusions: bool = True,
     keep_response_text: bool = False,
+    enrich: bool = True,
 ) -> dict[str, dict[str, Any]]:
     """Library API. Never calls sys.exit."""
     from dubois.notify import QueryNotify as QN
@@ -588,4 +616,5 @@ def search(
         calibrate=calibrate,
         engine=engine,
         keep_response_text=keep_response_text,
+        enrich=enrich,
     )

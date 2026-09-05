@@ -148,5 +148,6 @@ def write_jsonl(path: str, username: str, results: dict[str, dict[str, Any]]) ->
                 "http_status": data.get("http_status"),
                 "query_time": status.query_time if status is not None else None,
                 "context": status.context if status is not None else None,
+                "profile": data.get("profile"),
             }
             handle.write(json.dumps(record, ensure_ascii=False) + "\n")

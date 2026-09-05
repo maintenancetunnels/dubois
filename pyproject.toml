@@ -7,7 +7,7 @@ source = "init"
 
 [tool.poetry]
 name = "dubois-osint"
-version = "0.17.0"
+version = "0.18.0"
 description = "DuBois: downstream Sherlock fork. Hunt usernames across social networks."
 license = "MIT"
 authors = [
@@ -42,6 +42,15 @@ aiohttp = "^3.9.0"
 openpyxl = "^3.0.10"
 tomli = "^2.2.1"
 jsonschema = "^4.0.0"
+holehe = { version = "*", optional = true }
+ignorant = { version = "*", optional = true }
+maigret = { version = "*", optional = true }
+
+[tool.poetry.extras]
+email = ["holehe"]
+phone = ["ignorant"]
+deep = ["maigret"]
+full = ["holehe", "ignorant", "maigret"]
 
 [tool.poetry.group.dev.dependencies]
 jsonschema = "^4.0.0"

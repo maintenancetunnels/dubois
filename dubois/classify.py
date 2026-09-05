@@ -102,6 +102,8 @@ def classify_http(
     error_msg: Any = None,
     error_code: Any = None,
     error_text: str | None = None,
+    claimed_msg: Any = None,
+    claimed_code: Any = None,
 ) -> tuple[QueryStatus, str | None]:
     """Return (status, context) for one probe response."""
     if error_text is not None:
@@ -114,11 +116,22 @@ def classify_http(
     if not types:
         return QueryStatus.UNKNOWN, "No errorType configured"
 
-    unknown_types = [t for t in types if t not in ("message", "status_code", "response_url")]
-    if unknown_types and not any(t in ("message", "status_code", "response_url") for t in types):
+    known = ("message", "status_code", "response_url", "presence")
+    unknown_types = [t for t in types if t not in known]
+    if unknown_types and not any(t in known for t in types):
         return QueryStatus.UNKNOWN, f"Unknown error type '{error_type}'"
 
     query_status = QueryStatus.UNKNOWN
+
+    if "presence" in types:
+        return _classify_presence(
+            status_code=status_code,
+            text=text,
+            available_msg=error_msg,
+            available_code=error_code,
+            claimed_msg=claimed_msg,
+            claimed_code=claimed_code,
+        )
 
     if "message" in types:
         if error_message_hits(text, error_msg):
@@ -155,3 +168,40 @@ def classify_http(
             return QueryStatus.UNKNOWN, f"HTTP {status_code}"
 
     return query_status, None
+
+
+def _classify_presence(
+    *,
+    status_code: int | None,
+    text: str,
+    available_msg: Any,
+    available_code: Any,
+    claimed_msg: Any,
+    claimed_code: Any,
+) -> tuple[QueryStatus, str | None]:
+    """WhatsMyName-style: missing-string/code vs claimed-string/code."""
+    if status_code is None:
+        return QueryStatus.UNKNOWN, "No HTTP status"
+    if status_code in SOFT_FAIL_CODES or status_code >= 500:
+        return QueryStatus.UNKNOWN, f"HTTP {status_code}"
+
+    avail_codes = as_list(available_code)
+    claim_codes = as_list(claimed_code)
+    missing_by_msg = bool(available_msg) and error_message_hits(text, available_msg)
+    claimed_by_msg = bool(claimed_msg) and error_message_hits(text, claimed_msg)
+
+    if missing_by_msg:
+        return QueryStatus.AVAILABLE, None
+    if claimed_by_msg:
+        return QueryStatus.CLAIMED, None
+    if avail_codes and status_code in avail_codes and not available_msg:
+        return QueryStatus.AVAILABLE, None
+    if claim_codes and status_code in claim_codes and not claimed_msg:
+        return QueryStatus.CLAIMED, None
+    if avail_codes and status_code in avail_codes:
+        return QueryStatus.AVAILABLE, None
+    if claim_codes and status_code in claim_codes:
+        return QueryStatus.CLAIMED, None
+    if status_code in NOT_FOUND_CODES:
+        return QueryStatus.AVAILABLE, None
+    return QueryStatus.UNKNOWN, f"HTTP {status_code}"

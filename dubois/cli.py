@@ -15,11 +15,15 @@ from dubois.__init__ import (
     __shortname__,
     __version__,
 )
+from dubois.dorks import email_dorks, print_dorks, username_dorks
 from dubois.engine import sherlock
+from dubois.extras import run_holehe, run_ignorant, run_maigret
 from dubois.notify import QueryNotifyPrint
 from dubois.probe import check_for_parameter, multiple_usernames
+from dubois.records import print_records
 from dubois.report import result_path, write_csv, write_jsonl, write_txt, write_xlsx
 from dubois.sites import SitesInformation
+from dubois.wmn import merge_wmn
 
 
 def timeout_check(value):
@@ -205,7 +209,7 @@ def build_parser() -> ArgumentParser:
         nargs="+",
         metavar="USERNAMES",
         action="store",
-        help="One or more usernames to check with social networks. Check similar usernames using {?} (replace to '_', '-', '.').",
+        help="Username(s), or email/phone when --email/--phone is set. Usernames: {?} expands to '_', '-', '.'.",
     )
     parser.add_argument(
         "--browse",
@@ -241,6 +245,56 @@ def build_parser() -> ArgumentParser:
         dest="ignore_exclusions",
         default=False,
         help="Ignore upstream exclusions (may return more false positives)",
+    )
+    parser.add_argument(
+        "--whatsmyname",
+        "--wmn",
+        action="store_true",
+        dest="whatsmyname",
+        default=False,
+        help="Merge WhatsMyName site rules (CC BY-SA 4.0) for names not already in the Sherlock list.",
+    )
+    parser.add_argument(
+        "--email",
+        action="store_true",
+        dest="email_mode",
+        default=False,
+        help="Treat TARGET as an email and run holehe (optional extra). Skips password-recovery probes.",
+    )
+    parser.add_argument(
+        "--phone",
+        action="store_true",
+        dest="phone_mode",
+        default=False,
+        help="Treat TARGET as a phone number and run ignorant (optional extra).",
+    )
+    parser.add_argument(
+        "--deep",
+        action="store_true",
+        dest="deep",
+        default=False,
+        help="After the username hunt, run maigret if installed (optional extra).",
+    )
+    parser.add_argument(
+        "--dorks",
+        action="store_true",
+        dest="dorks",
+        default=False,
+        help="Print search-engine query URLs. Does not scrape Google.",
+    )
+    parser.add_argument(
+        "--records",
+        action="store_true",
+        dest="records",
+        default=False,
+        help="Print official public-record search URLs. DuBois does not scrape courts or assessors.",
+    )
+    parser.add_argument(
+        "--enrich",
+        action=argparse.BooleanOptionalAction,
+        dest="enrich",
+        default=True,
+        help="Parse public OG/JSON-LD fields from claimed profile pages (default: true).",
     )
     return parser
 
@@ -310,6 +364,10 @@ def main(argv: list[str] | None = None) -> None:
     else:
         init(autoreset=True)
 
+    if args.email_mode and args.phone_mode:
+        print("Use either --email or --phone, not both.")
+        sys.exit(1)
+
     if args.output is not None and args.folderoutput is not None:
         print("You can only use one of the output methods.")
         sys.exit(1)
@@ -323,6 +381,66 @@ def main(argv: list[str] | None = None) -> None:
         sys.exit(1)
 
     try:
+        if args.email_mode:
+            _run_email_mode(args)
+            return
+        if args.phone_mode:
+            _run_phone_mode(args)
+            return
+        _run_username_mode(args)
+    except KeyboardInterrupt:
+        print("\nInterrupted.", file=sys.stderr)
+        sys.exit(130)
+
+
+def _run_email_mode(args) -> None:
+    code = 0
+    for email in args.username:
+        print(f"[*] Email {email}")
+        rc = run_holehe(email, timeout=max(30, int(args.timeout) * 20))
+        if args.dorks:
+            print_dorks(email_dorks(email))
+        if args.records:
+            print_records(email)
+        if rc not in (0,):
+            code = rc
+        print()
+    sys.exit(code)
+
+
+def _run_phone_mode(args) -> None:
+    code = 0
+    for phone in args.username:
+        print(f"[*] Phone {phone}")
+        rc = run_ignorant(phone, timeout=max(30, int(args.timeout) * 20))
+        if args.dorks:
+            print_dorks(username_dorks(phone))
+        if args.records:
+            print_records(phone)
+        if rc not in (0,):
+            code = rc
+        print()
+    sys.exit(code)
+
+
+def _useful_alias(username: str, value: str | None) -> bool:
+    if not value:
+        return False
+    text = value.strip()
+    if not text:
+        return False
+    lower = text.casefold()
+    user = username.casefold()
+    if lower == user:
+        return False
+    for sep in (" - ", " | ", " — ", " / "):
+        if lower.startswith(user + sep):
+            return False
+    return True
+
+
+def _run_username_mode(args) -> None:
+    try:
         sites = load_sites(args)
     except Exception as error:
         print(f"ERROR:  {error}")
@@ -332,6 +450,9 @@ def main(argv: list[str] | None = None) -> None:
         sites.remove_nsfw_sites(do_not_remove=args.site_list)
 
     site_data = prune_sites(sites, args.site_list)
+    if args.whatsmyname:
+        site_data, added = merge_wmn(site_data, nsfw=args.nsfw)
+        print(f"[*] WhatsMyName: added {added} extra sites")
 
     query_notify = QueryNotifyPrint(
         result=None, verbose=args.verbose, print_all=args.print_all, browse=args.browse
@@ -346,51 +467,66 @@ def main(argv: list[str] | None = None) -> None:
         else:
             all_usernames.append(username)
 
-    try:
-        for username in all_usernames:
-            results = sherlock(
+    for username in all_usernames:
+        results = sherlock(
+            username,
+            site_data,
+            query_notify,
+            dump_response=args.dump_response,
+            proxy=args.proxy,
+            timeout=args.timeout,
+            workers=args.workers,
+            calibrate=args.calibrate,
+            engine=engine,
+            enrich=args.enrich,
+        )
+
+        txt_path = result_path(username, args.folderoutput, ".txt", args.output)
+        if args.output_txt or args.output:
+            write_txt(txt_path, results)
+
+        if args.csv:
+            write_csv(
+                result_path(username, args.folderoutput, ".csv"),
                 username,
-                site_data,
-                query_notify,
-                dump_response=args.dump_response,
-                proxy=args.proxy,
-                timeout=args.timeout,
-                workers=args.workers,
-                calibrate=args.calibrate,
-                engine=engine,
+                results,
+                print_found=args.print_found,
+                print_all=args.print_all,
             )
 
-            txt_path = result_path(username, args.folderoutput, ".txt", args.output)
-            if args.output_txt or args.output:
-                write_txt(txt_path, results)
+        if args.xlsx:
+            write_xlsx(
+                result_path(username, args.folderoutput, ".xlsx"),
+                username,
+                results,
+                print_found=args.print_found,
+                print_all=args.print_all,
+            )
 
-            if args.csv:
-                write_csv(
-                    result_path(username, args.folderoutput, ".csv"),
-                    username,
-                    results,
-                    print_found=args.print_found,
-                    print_all=args.print_all,
-                )
+        if args.jsonl:
+            write_jsonl(
+                result_path(username, args.folderoutput, ".jsonl"),
+                username,
+                results,
+            )
 
-            if args.xlsx:
-                write_xlsx(
-                    result_path(username, args.folderoutput, ".xlsx"),
-                    username,
-                    results,
-                    print_found=args.print_found,
-                    print_all=args.print_all,
-                )
+        extra_names = []
+        for data in results.values():
+            profile = data.get("profile") or {}
+            for key in ("display_name", "title"):
+                value = profile.get(key)
+                if _useful_alias(username, value):
+                    extra_names.append(value)
+        if args.dorks:
+            print_dorks(username_dorks(username, extra_names=extra_names))
+        if args.records:
+            print_records(username)
+            for name in extra_names:
+                if name and name.casefold() != username.casefold():
+                    print_records(name)
+        if args.deep:
+            print(f"[*] maigret {username}")
+            run_maigret(username)
 
-            if args.jsonl:
-                write_jsonl(
-                    result_path(username, args.folderoutput, ".jsonl"),
-                    username,
-                    results,
-                )
-
-            print()
-        query_notify.finish()
-    except KeyboardInterrupt:
-        print("\nInterrupted.", file=sys.stderr)
-        sys.exit(130)
+        print()
+    query_notify.finish()
