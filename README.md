@@ -47,7 +47,11 @@ holehe is run with `-NP` so password-recovery probes (which can notify the inbox
 
 ## Public records
 
-**DuBois does not scrape courts, assessors, or voter rolls.** Those sites are often public in a browser and forbidden to harvest in bulk. `--records` prints official search URLs (CourtListener, SEC EDGAR, OpenCorporates, site:.gov dorks) for you to open. `--dorks` prints search-engine URLs; it does not scrape Google.
+`--records` **queries public APIs** (CourtListener RECAP/opinions, SEC EDGAR full-text, Federal Register, OpenCorporates, OpenSanctions) and also prints search URLs for sources without an anonymous API.
+
+It does not log into PACER or skip PACER fees. It does not bypass login walls or CAPTCHAs. Optional tokens raise rate limits: `COURTLISTENER_TOKEN`, `OPENSANCTIONS_API_KEY`, `OPENCORPORATES_API_TOKEN`.
+
+`--dorks` prints search-engine URLs. It does not scrape Google.
 
 ```
 dubois --help

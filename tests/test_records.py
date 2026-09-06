@@ -1,16 +1,41 @@
+from unittest.mock import MagicMock
+
 from dubois.dorks import username_dorks
 from dubois.extras import split_phone
-from dubois.records import public_record_links
+from dubois.records import probe_courtlistener, public_record_links
 from dubois.classify import classify_http
 from dubois.result import QueryStatus
 
 
-def test_records_are_links_not_fetches():
+def test_record_links_still_exist():
     rows = public_record_links("Jane Doe")
     labels = [label for label, _url in rows]
     assert any("CourtListener" in label for label in labels)
     assert any("EDGAR" in label for label in labels)
     assert all(url.startswith("https://") for _label, url in rows)
+
+
+def test_courtlistener_probe_parses_dockets():
+    session = MagicMock()
+    response = MagicMock()
+    response.status_code = 200
+    response.json.return_value = {
+        "count": 1,
+        "results": [
+            {
+                "caseName": "United States v. Doe",
+                "docket_absolute_url": "/docket/1/united-states-v-doe/",
+                "court": "S.D.N.Y.",
+                "dateFiled": "2005-01-01",
+            }
+        ],
+    }
+    session.get.return_value = response
+    hits = probe_courtlistener("Doe", session=session)
+    assert hits
+    assert hits[0].source == "CourtListener"
+    assert "United States v. Doe" in hits[0].title
+    assert "courtlistener.com/docket/1/" in hits[0].url
 
 
 def test_dorks_do_not_hit_the_network():

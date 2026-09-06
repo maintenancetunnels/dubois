@@ -287,7 +287,7 @@ def build_parser() -> ArgumentParser:
         action="store_true",
         dest="records",
         default=False,
-        help="Print official public-record search URLs. DuBois does not scrape courts or assessors.",
+        help="Probe public-record APIs (CourtListener, EDGAR, Federal Register, OpenCorporates, OpenSanctions) and print search URLs.",
     )
     parser.add_argument(
         "--enrich",
