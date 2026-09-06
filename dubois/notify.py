@@ -45,6 +45,7 @@ class QueryNotifyPrint(QueryNotify):
         self.print_all = print_all
         self.browse = browse
         self.claimed_count = 0
+        self.strong_claimed = 0
 
     def start(self, message):
         title = "Checking username"
@@ -72,25 +73,34 @@ class QueryNotifyPrint(QueryNotify):
 
         if result.status == QueryStatus.CLAIMED:
             self.claimed_count += 1
+            p = float(getattr(result, "p_profile", 0.0) or 0.0)
+            if p >= 0.5:
+                self.strong_claimed += 1
             extra = ""
             if self.result.context:
                 extra = Style.DIM + f"  {self.result.context}" + Style.RESET_ALL
+            mark = "+" if p >= 0.5 else "~"
+            mark_color = Fore.GREEN if p >= 0.5 else Fore.YELLOW
             print(
                 Style.BRIGHT
                 + Fore.WHITE
                 + "["
-                + Fore.GREEN
-                + "+"
+                + mark_color
+                + mark
                 + Fore.WHITE
                 + "]"
                 + response_time_text
                 + Fore.GREEN
-                + f" {self.result.site_name}: "
+                + f" {self.result.site_name}"
+                + Fore.WHITE
+                + f" p={p:.2f}"
+                + Fore.GREEN
+                + ": "
                 + Style.RESET_ALL
                 + f"{self.result.site_url_user}"
                 + extra
             )
-            if self.browse:
+            if self.browse and p >= 0.5:
                 webbrowser.open(self.result.site_url_user, 2)
 
         elif result.status == QueryStatus.AVAILABLE:
@@ -180,7 +190,11 @@ class QueryNotifyPrint(QueryNotify):
             + Fore.WHITE
             + f" {self.claimed_count} "
             + Fore.GREEN
-            + "results"
+            + "claimed ("
+            + Fore.WHITE
+            + f"{self.strong_claimed}"
+            + Fore.GREEN
+            + " p>=0.5)"
             + Style.RESET_ALL
         )
 

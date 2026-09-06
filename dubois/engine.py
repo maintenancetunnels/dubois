@@ -14,6 +14,7 @@ from requests_futures.sessions import FuturesSession
 
 from dubois.classify import classify_http
 from dubois.enrich import extract_profile
+from dubois.score import score_profile
 from dubois.notify import QueryNotify
 from dubois.probe import (
     HEAD_FALLBACK_CODES,
@@ -146,6 +147,16 @@ def _store_outcome(
         if any((facts.title, facts.display_name, facts.bio, facts.image, facts.links)):
             profile = facts.as_dict()
             result.context = facts.one_line() or result.context
+    p_profile, reasons = score_profile(
+        status=status,
+        http_status=outcome.status_code,
+        text=outcome.text or "",
+        error_text=outcome.error_text,
+        profile=profile,
+        username=probe.username,
+    )
+    result.p_profile = p_profile
+    result.score_reasons = reasons
     return {
         "url_main": net_info.get("urlMain"),
         "url_user": probe.url_user,
@@ -153,6 +164,8 @@ def _store_outcome(
         "http_status": http_status,
         "response_text": response_text,
         "profile": profile,
+        "p_profile": p_profile,
+        "score_reasons": list(reasons),
     }
 
 

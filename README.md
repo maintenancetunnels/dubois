@@ -34,6 +34,8 @@ dubois --deep someuser
 
 Claimed hits now parse public Open Graph / JSON-LD (name, bio, avatar). `--no-enrich` turns that off.
 
+Each hit gets **`p_profile`**: P(this page is a real profile), not P(this is the same human). Strong hits print `[+]` (`p>=0.5`); weak claimed print `[~]`. Jsonl includes `p_profile` and `score_reasons`.
+
 `--email` / `--phone` / `--deep` wrap **holehe**, **ignorant**, and **maigret** if installed:
 
 ```

@@ -7,7 +7,7 @@ source = "init"
 
 [tool.poetry]
 name = "dubois-osint"
-version = "0.20.0"
+version = "0.21.0"
 description = "DuBois: downstream Sherlock fork. Hunt usernames across social networks."
 license = "MIT"
 authors = [

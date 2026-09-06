@@ -31,9 +31,13 @@ class QueryResult:
     status: QueryStatus
     query_time: float | None = None
     context: str | None = None
+    p_profile: float = 0.0
+    score_reasons: tuple[str, ...] = ()
 
     def __str__(self) -> str:
         status = str(self.status)
+        if self.status is QueryStatus.CLAIMED:
+            status += f" p={self.p_profile:.2f}"
         if self.context is not None:
             status += f" ({self.context})"
         return status
