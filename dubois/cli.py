@@ -20,7 +20,7 @@ from dubois.engine import sherlock
 from dubois.extras import run_holehe, run_ignorant, run_maigret
 from dubois.notify import QueryNotifyPrint
 from dubois.probe import check_for_parameter, multiple_usernames
-from dubois.records import print_records
+from dubois.records import print_records, write_records_jsonl
 from dubois.report import result_path, write_csv, write_jsonl, write_txt, write_xlsx
 from dubois.sites import SitesInformation
 from dubois.wmn import merge_wmn
@@ -401,7 +401,9 @@ def _run_email_mode(args) -> None:
         if args.dorks:
             print_dorks(email_dorks(email))
         if args.records:
-            print_records(email)
+            rec = print_records(email)
+            if args.jsonl:
+                write_records_jsonl(result_path(email, args.folderoutput, ".records.jsonl"), rec)
         if rc not in (0,):
             code = rc
         print()
@@ -416,7 +418,9 @@ def _run_phone_mode(args) -> None:
         if args.dorks:
             print_dorks(username_dorks(phone))
         if args.records:
-            print_records(phone)
+            rec = print_records(phone)
+            if args.jsonl:
+                write_records_jsonl(result_path(phone, args.folderoutput, ".records.jsonl"), rec)
         if rc not in (0,):
             code = rc
         print()
@@ -520,10 +524,14 @@ def _run_username_mode(args) -> None:
         if args.dorks:
             print_dorks(username_dorks(username, extra_names=extra_names))
         if args.records:
-            print_records(username)
+            rec = print_records(username)
             for name in extra_names:
                 if name and name.casefold() != username.casefold():
-                    print_records(name)
+                    rec.extend(print_records(name))
+            if args.jsonl:
+                write_records_jsonl(
+                    result_path(username, args.folderoutput, ".records.jsonl"), rec
+                )
         if args.deep:
             print(f"[*] maigret {username}")
             run_maigret(username)

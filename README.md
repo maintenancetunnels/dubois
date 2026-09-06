@@ -47,9 +47,11 @@ holehe is run with `-NP` so password-recovery probes (which can notify the inbox
 
 ## Public records
 
-`--records` **queries public APIs** (CourtListener RECAP/opinions, SEC EDGAR full-text, Federal Register, OpenCorporates, OpenSanctions) and also prints search URLs for sources without an anonymous API.
+`--records` fires a parallel battery of **public APIs** (courts, money, sanctions, companies, leaks, geo, archives) and prints leftover search URLs.
 
-It does not log into PACER or skip PACER fees. It does not bypass login walls or CAPTCHAs. Optional tokens raise rate limits: `COURTLISTENER_TOKEN`, `OPENSANCTIONS_API_KEY`, `OPENCORPORATES_API_TOKEN`.
+Probes include CourtListener (RECAP/opinions/judges), SEC EDGAR, Federal Register, OpenCorporates (companies + officers), OpenSanctions, Wikidata, Wikipedia, LittleSis, ProPublica nonprofits, FEC, USASpending, NPI, GLEIF, EPA ECHO, CFPB, OCCRP Aleph, ICIJ Offshore Leaks, Wayback CDX, data.gov, OpenStreetMap/Nominatim. Optional keys: `COURTLISTENER_TOKEN`, `OPENSANCTIONS_API_KEY`, `OPENCORPORATES_API_TOKEN`, `FEC_API_KEY`, `OPENSTATES_API_KEY`, `COMPANIES_HOUSE_API_KEY`, `CONGRESS_GOV_KEY`.
+
+It does not log into PACER or skip PACER fees. It does not bypass login walls or CAPTCHAs. `--jsonl` also writes `*.records.jsonl`.
 
 `--dorks` prints search-engine URLs. It does not scrape Google.
 

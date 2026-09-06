@@ -10,6 +10,7 @@ credentials, no fee-skipping. Optional tokens raise rate limits:
 from __future__ import annotations
 
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, asdict
 from typing import Any
 from urllib.parse import quote_plus, urljoin
@@ -90,7 +91,13 @@ def probe_courtlistener(query: str, *, session: requests.Session | None = None) 
     if token:
         headers["Authorization"] = f"Token {token}"
     hits: list[RecordHit] = []
-    for kind, label in (("r", "RECAP docket"), ("o", "opinion"), ("oa", "oral argument")):
+    for kind, label in (
+        ("r", "RECAP docket"),
+        ("rd", "RECAP filing"),
+        ("o", "opinion"),
+        ("oa", "oral argument"),
+        ("p", "judge"),
+    ):
         url = "https://www.courtlistener.com/api/rest/v4/search/"
         try:
             resp = session.get(
@@ -294,24 +301,46 @@ def probe_opensanctions(query: str, *, session: requests.Session | None = None) 
 
 
 def probe_records(query: str, *, session: requests.Session | None = None) -> list[RecordHit]:
-    """Hit public APIs. Empty list means none of the endpoints returned a match."""
+    """Hit every public API we ship. Failures become notes, not crashes."""
+    from dubois.records_extra import PROBES as extra_probes
+
     session = session or _session()
-    hits: list[RecordHit] = []
-    for fn in (
+    fns = [
         probe_courtlistener,
         probe_edgar,
         probe_federal_register,
         probe_opencorporates,
         probe_opensanctions,
-    ):
-        try:
-            hits.extend(fn(query, session=session))
-        except Exception as error:
-            hits.append(RecordHit(fn.__name__, "probe crashed", "", str(error)))
+        *extra_probes,
+    ]
+    hits: list[RecordHit] = []
+
+    def _run(fn):
+        return fn(query, session=session)
+
+    with ThreadPoolExecutor(max_workers=min(16, len(fns))) as pool:
+        futures = {pool.submit(_run, fn): fn for fn in fns}
+        for fut in as_completed(futures):
+            fn = futures[fut]
+            try:
+                hits.extend(fut.result() or [])
+            except Exception as error:
+                hits.append(RecordHit(getattr(fn, "__name__", "probe"), "probe crashed", "", str(error)))
     return hits
 
 
-def print_records(query: str) -> None:
+def write_records_jsonl(path: str, hits: list[RecordHit]) -> None:
+    import json
+
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as handle:
+        for hit in hits:
+            handle.write(json.dumps(hit.as_dict(), ensure_ascii=False) + "\n")
+
+
+def print_records(query: str) -> list[RecordHit]:
     print(f"[*] Public-record probe for {query}")
     hits = probe_records(query)
 
@@ -339,3 +368,4 @@ def print_records(query: str) -> None:
     for label, url in public_record_links(query):
         print(f"    {label}")
         print(f"      {url}")
+    return hits

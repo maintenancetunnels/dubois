@@ -15,6 +15,18 @@ def test_record_links_still_exist():
     assert all(url.startswith("https://") for _label, url in rows)
 
 
+def test_maximalist_probe_registry():
+    from dubois.records_extra import PROBES
+
+    names = {fn.__name__ for fn in PROBES}
+    assert "probe_wikidata" in names
+    assert "probe_fec" in names
+    assert "probe_npi" in names
+    assert "probe_wayback" in names
+    assert "probe_icij" in names
+    assert len(PROBES) >= 15
+
+
 def test_courtlistener_probe_parses_dockets():
     session = MagicMock()
     response = MagicMock()
