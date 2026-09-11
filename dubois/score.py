@@ -7,15 +7,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from dubois.identity import is_chrome_text, looks_like_person_name
 from dubois.result import QueryStatus
-
-CHROME_TITLE = re.compile(
-    r"(security verification|just a moment|attention required|access denied|"
-    r"cf-error|error\s*$|steam community :: error|internet archive|"
-    r"wayback machine|pardon our interruption|enable javascript|"
-    r"checking your browser|please wait)",
-    re.I,
-)
 
 UNIQUE_NAME = re.compile(r"^.{1,80}\s*\(\s*[^)]+\s*\)\s*$")
 
@@ -32,6 +25,7 @@ def score_profile(
     error_text: str | None = None,
     profile: dict[str, Any] | None = None,
     username: str = "",
+    site_name: str = "",
 ) -> tuple[float, tuple[str, ...]]:
     reasons: list[str] = [f"status:{status.value}"]
     profile = profile or {}
@@ -80,20 +74,27 @@ def score_profile(
     title = str(profile.get("title") or "")
     display = str(profile.get("display_name") or "")
     bio = str(profile.get("bio") or "")
-    blob = f"{title}\n{display}\n{bio}"
-    if CHROME_TITLE.search(blob):
-        p = min(p, 0.18)
-        reasons.append("chrome_title")
+    blob = f"{title}\n{display}\n{bio}\n{body[:4000]}"
+    chrome = is_chrome_text(blob) or is_chrome_text(title) or is_chrome_text(display) or is_chrome_text(bio)
+    site = site_name.strip()
+    sitename_display = bool(
+        display and site and display.casefold() in {site.casefold(), f"{site.casefold()} profile"}
+    )
 
     uname = username.strip()
-    if uname and uname.casefold() in bio.casefold() and len(bio) > len(uname) + 3:
+    if (
+        uname
+        and uname.casefold() in bio.casefold()
+        and len(bio) > len(uname) + 3
+        and not is_chrome_text(bio)
+    ):
         p += 0.22
         reasons.append("bio_has_username")
-    if display and uname and uname.casefold() not in display.casefold():
-        if UNIQUE_NAME.search(display) or (len(display) > 2 and display.casefold() != title.casefold()):
+    if display and uname and uname.casefold() not in display.casefold() and looks_like_person_name(display):
+        if UNIQUE_NAME.search(display) or display.casefold() != title.casefold():
             p += 0.12
             reasons.append("distinct_display_name")
-    if profile.get("links"):
+    if profile.get("links") and not chrome:
         p += 0.05
         reasons.append("outbound_links")
 
@@ -101,5 +102,11 @@ def score_profile(
     if "challenge-running" in lower_body or "cf-browser-verification" in lower_body:
         p = min(p, 0.12)
         reasons.append("challenge_page")
+    if chrome:
+        p = min(p, 0.18)
+        reasons.append("chrome_title")
+    if sitename_display:
+        p = min(p, 0.22)
+        reasons.append("display_is_sitename")
 
     return _clamp(p), tuple(reasons)

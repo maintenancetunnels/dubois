@@ -143,7 +143,7 @@ def _store_outcome(
             response_text = ""
     profile = None
     if status is QueryStatus.CLAIMED and outcome.text:
-        facts = extract_profile(outcome.text, probe.url_user)
+        facts = extract_profile(outcome.text, probe.url_user, username=probe.username)
         if any((facts.title, facts.display_name, facts.bio, facts.image, facts.links)):
             profile = facts.as_dict()
             result.context = facts.one_line() or result.context
@@ -154,6 +154,7 @@ def _store_outcome(
         error_text=outcome.error_text,
         profile=profile,
         username=probe.username,
+        site_name=probe.site_name,
     )
     result.p_profile = p_profile
     result.score_reasons = reasons
@@ -408,28 +409,42 @@ async def _run_async_coro(
     )
     sem = asyncio.Semaphore(workers)
     timeout_cfg = aiohttp.ClientTimeout(total=timeout)
+    queue: asyncio.Queue[Probe] = asyncio.Queue()
+    for probe in probes:
+        queue.put_nowait(probe)
+
     async with aiohttp.ClientSession(connector=connector, timeout=timeout_cfg) as session:
-        tasks = [
-            asyncio.create_task(_fetch_one(session, probe, timeout, proxy, sem))
-            for probe in probes
-        ]
+        async def worker() -> list[ProbeOutcome]:
+            found: list[ProbeOutcome] = []
+            while True:
+                try:
+                    probe = queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    return found
+                found.append(await _fetch_one(session, probe, timeout, proxy, sem))
+
+        n_workers = min(max(workers, 1), max(len(probes), 1))
+        tasks = [asyncio.create_task(worker()) for _ in range(n_workers)]
         try:
-            gathered = await asyncio.gather(*tasks, return_exceptions=False)
+            batches = await asyncio.gather(*tasks, return_exceptions=False)
         except (KeyboardInterrupt, asyncio.CancelledError):
             for task in tasks:
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
             raise
     outcomes: dict[tuple[str, bool], ProbeOutcome] = {}
-    for outcome in gathered:
-        outcomes[(outcome.probe.site_name, outcome.probe.is_control)] = outcome
+    for batch in batches:
+        for outcome in batch:
+            outcomes[(outcome.probe.site_name, outcome.probe.is_control)] = outcome
     return outcomes
 
 
 def _ensure_windows_loop_policy() -> None:
+    # Proactor/IOCP has no select() 512-FD cap. Selector dies once WhatsMyName
+    # (or calibrate) queues hundreds of sockets, even with a worker semaphore.
     if sys.platform == "win32":
         try:
-            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+            asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
         except Exception:
             pass
 

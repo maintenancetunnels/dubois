@@ -16,6 +16,7 @@ from dubois.__init__ import (
     __version__,
 )
 from dubois.dorks import email_dorks, print_dorks, username_dorks
+from dubois.identity import collect_aliases
 from dubois.engine import sherlock
 from dubois.extras import run_holehe, run_ignorant, run_maigret
 from dubois.notify import QueryNotifyPrint
@@ -428,19 +429,16 @@ def _run_phone_mode(args) -> None:
 
 
 def _useful_alias(username: str, value: str | None) -> bool:
+    from dubois.identity import looks_like_person_name
+
     if not value:
         return False
     text = value.strip()
     if not text:
         return False
-    lower = text.casefold()
-    user = username.casefold()
-    if lower == user:
+    if text.casefold() == username.casefold():
         return False
-    for sep in (" - ", " | ", " — ", " / "):
-        if lower.startswith(user + sep):
-            return False
-    return True
+    return looks_like_person_name(text)
 
 
 def _run_username_mode(args) -> None:
@@ -514,20 +512,13 @@ def _run_username_mode(args) -> None:
                 results,
             )
 
-        extra_names = []
-        for data in results.values():
-            profile = data.get("profile") or {}
-            for key in ("display_name", "title"):
-                value = profile.get(key)
-                if _useful_alias(username, value):
-                    extra_names.append(value)
+        extra_names = collect_aliases(username, results)
         if args.dorks:
             print_dorks(username_dorks(username, extra_names=extra_names))
         if args.records:
             rec = print_records(username)
             for name in extra_names:
-                if name and name.casefold() != username.casefold():
-                    rec.extend(print_records(name))
+                rec.extend(print_records(name))
             if args.jsonl:
                 write_records_jsonl(
                     result_path(username, args.folderoutput, ".records.jsonl"), rec

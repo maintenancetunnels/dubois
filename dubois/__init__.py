@@ -6,16 +6,20 @@ import tomli
 
 
 def get_version() -> str:
-    """Fetch the version number of the installed package."""
+    """Prefer the checkout pyproject so an editable install is not stuck on pip metadata."""
+    pyproject_path: pathlib.Path = pathlib.Path(__file__).resolve().parent.parent / "pyproject.toml"
+    if pyproject_path.is_file():
+        with pyproject_path.open("rb") as f:
+            pyproject_data = tomli.load(f)
+        version = pyproject_data.get("tool", {}).get("poetry", {}).get("version")
+        if version:
+            return version
     for dist_name in ("dubois-osint", "dubois"):
         try:
             return pkg_version(dist_name)
         except PackageNotFoundError:
             continue
-    pyproject_path: pathlib.Path = pathlib.Path(__file__).resolve().parent.parent / "pyproject.toml"
-    with pyproject_path.open("rb") as f:
-        pyproject_data = tomli.load(f)
-    return pyproject_data["tool"]["poetry"]["version"]
+    return "0.0.0"
 
 # This variable is only used to check for ImportErrors induced by users running as script rather than as module or package
 import_error_test_var = None

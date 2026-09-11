@@ -1,4 +1,4 @@
-from dubois.cli import _remote_is_newer, build_parser
+from dubois.cli import _remote_is_newer, _useful_alias, build_parser
 
 
 def test_fork_ahead_of_upstream_is_not_an_update():
@@ -13,3 +13,10 @@ def test_print_found_can_be_disabled():
     assert args.print_found is False
     args = parser.parse_args(["alice"])
     assert args.print_found is True
+
+
+def test_useful_alias_rejects_chrome():
+    assert _useful_alias("sdushantha", "Siddharth Dushantha") is True
+    assert _useful_alias("sdushantha", "Security Verification") is False
+    assert _useful_alias("sdushantha", "sdushantha") is False
+    assert _useful_alias("sdushantha", "Galaxy A07") is False

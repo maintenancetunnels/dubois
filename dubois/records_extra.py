@@ -5,6 +5,7 @@ import os
 from typing import Any
 import requests
 
+from dubois.identity import label_matches_query
 from dubois.records import MAX_HITS, TIMEOUT, RecordHit, _q
 
 FEC_KEY = lambda: os.environ.get("FEC_API_KEY", "").strip() or "DEMO_KEY"
@@ -47,11 +48,14 @@ def probe_wikidata(query: str, *, session: requests.Session | None = None) -> li
         return []
     out = []
     for row in payload.get("search") or []:
+        label = row.get("label") or query
+        if not label_matches_query(query, str(label)):
+            continue
         ident = row.get("id") or ""
         out.append(
             RecordHit(
                 "Wikidata",
-                row.get("label") or query,
+                label,
                 f"https://www.wikidata.org/wiki/{ident}" if ident else "https://www.wikidata.org",
                 row.get("description"),
             )
@@ -71,6 +75,8 @@ def probe_wikipedia(query: str, *, session: requests.Session | None = None) -> l
     titles, descs, urls = payload[1], payload[2], payload[3]
     out = []
     for i, title in enumerate(titles[:MAX_HITS]):
+        if not label_matches_query(query, str(title)):
+            continue
         href = urls[i] if i < len(urls) else ""
         desc = descs[i] if i < len(descs) else ""
         out.append(RecordHit("Wikipedia", title, href, desc or None))

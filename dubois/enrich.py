@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 from html import unescape
 from urllib.parse import urljoin, urlparse
 
+from dubois.identity import is_chrome_text, looks_like_person_name
+
 _OG = re.compile(
     r"""<meta\s+[^>]*property=["']og:(title|description|image|url)["'][^>]*content=["']([^"']+)["']""",
     re.I,
@@ -102,7 +104,7 @@ def _jsonld_name_bio(blob: str) -> tuple[str | None, str | None]:
     )
 
 
-def extract_profile(text: str, page_url: str = "") -> ProfileFacts:
+def extract_profile(text: str, page_url: str = "", username: str = "") -> ProfileFacts:
     facts = ProfileFacts()
     if not text:
         return facts
@@ -143,8 +145,16 @@ def extract_profile(text: str, page_url: str = "") -> ProfileFacts:
         # "alice (@alice) / X" or "alice | GitHub"
         head = re.split(r"\s+[|\u2013\u2014/\-]\s+", facts.title, maxsplit=1)[0]
         head = re.sub(r"\s*\(@?\w+\)\s*$", "", head).strip()
-        if head and head.lower() not in {"home", "profile", "github", "instagram"}:
+        user = username.strip().casefold()
+        if looks_like_person_name(head) or (user and head.casefold() == user):
             facts.display_name = head[:80]
+
+    if is_chrome_text(facts.title):
+        facts.title = None
+    if is_chrome_text(facts.display_name):
+        facts.display_name = None
+    if is_chrome_text(facts.bio):
+        facts.bio = None
 
     links: list[str] = []
     if facts.canonical:

@@ -27,6 +27,30 @@ def test_maximalist_probe_registry():
     assert len(PROBES) >= 15
 
 
+def test_wikipedia_drops_fuzzy_homophones():
+    from dubois.records_extra import probe_wikipedia
+
+    session = MagicMock()
+    response = MagicMock()
+    response.status_code = 200
+    response.json.return_value = [
+        "sdushantha",
+        ["Sushanth", "Susantha Chandramali", "Siddharth Dushantha"],
+        ["actor", "actress", "software author"],
+        [
+            "https://en.wikipedia.org/wiki/Sushanth",
+            "https://en.wikipedia.org/wiki/Susantha_Chandramali",
+            "https://en.wikipedia.org/wiki/Siddharth_Dushantha",
+        ],
+    ]
+    session.get.return_value = response
+    hits = probe_wikipedia("sdushantha", session=session)
+    titles = [hit.title for hit in hits]
+    assert "Sushanth" not in titles
+    assert "Susantha Chandramali" not in titles
+    assert titles == ["Siddharth Dushantha"]
+
+
 def test_courtlistener_probe_parses_dockets():
     session = MagicMock()
     response = MagicMock()
